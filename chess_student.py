@@ -6,6 +6,10 @@ from degree_freedom_king2 import *
 from features import *
 from generate_game import *
 from Q_values import *
+import time
+from tqdm import tqdm
+from tqdm import tqdm_gui
+
 
 size_board = 4
 
@@ -89,7 +93,15 @@ def main():
     """
 
     w_input_hidden = np.random.rand(n_hidden_layer,n_input_layer)/(n_input_layer * n_hidden_layer)
+    normW1 = np.sqrt(np.diag(w_input_hidden.dot(w_input_hidden.T)))
+    normW1 = normW1.reshape(n_hidden_layer, -1)
+    w_input_hidden = w_input_hidden/normW1
+    
     w_hidden_output = np.random.rand(n_output_layer,n_hidden_layer)/(n_hidden_layer * n_output_layer)
+    normW2 = np.sqrt(np.diag(w_hidden_output.dot(w_hidden_output.T)))
+    normW2 = normW2.reshape(n_output_layer, -1)
+    w_hidden_output = w_hidden_output/normW2
+    
     bias_W1 = np.zeros((n_hidden_layer))
     bias_W2 = np.zeros((n_output_layer))
 
@@ -101,8 +113,8 @@ def main():
     beta = 0.00005    #epsilon discount factor
     gamma = 0.85      #SARSA Learning discount factor
     eta = 0.0035      #learning rate
-    N_episodes = 100000 #Number of games, each game ends when we have a checkmate or a draw
-
+    N_episodes = 40000 #Number of games, each game ends when we have a checkmate or a draw
+    alpha = 1/10000
     ###  Training Loop  ###
 
     # Directions: down, up, right, left, down-right, down-left, up-right, up-left
@@ -121,13 +133,15 @@ def main():
     # NUMBER OF MOVES PER EPISODE, FILL THEM IN THE CODE ABOVE FOR THE
     # LEARNING. OTHER WAYS TO DO THIS ARE POSSIBLE, THIS IS A SUGGESTION ONLY.    
 
-    R_save = np.zeros([N_episodes, 1])
-    N_moves_save = np.zeros([N_episodes, 1])
-
+#    R_save = np.zeros([N_episodes, 1])
+    R_save = np.zeros([N_episodes+1, 1])
+    N_moves_save = np.zeros([N_episodes+1, 1])
+    
     # END OF SUGGESTIONS
     
 
-    for n in range(N_episodes):
+    for n in tqdm(range(N_episodes)):
+#    for n in (range(N_episodes)):
         epsilon_f = epsilon_0 / (1 + beta * n) #psilon is discounting per iteration to have less probability to explore
         checkmate = 0  # 0 = not a checkmate, 1 = checkmate
         draw = 0  # 0 = not a draw, 1 = draw
@@ -185,7 +199,7 @@ def main():
             chosen. For instance, if a_allowed = [8, 16, 32] and you select the third action, a_agent=32 not 3.
             """
             
-            greedy = (np.random.rand() > epsilon_0)
+            greedy = (np.random.rand() > epsilon_f)
             
             if greedy:
 #                a_agent = np.random.choice(allowed_a)
@@ -213,7 +227,7 @@ def main():
             
             #THE CODE ENDS HERE. 
 
-            print(a_agent)
+#            print(a_agent)
 
             # Player 1 makes the action
             if a_agent < possible_queen_a:
@@ -271,6 +285,8 @@ def main():
                 w_input_hidden = w_input_hidden + eta * np.outer(deltaHid, x)
                 bias_W1 = eta * deltaHid
                 
+                R_save[n+1, 0] = alpha * R + (1-alpha) * R_save[n, 0]
+                N_moves_save[n+1, 0] = alpha * i + (1-alpha) * N_moves_save[n, 0]
                 # THE CODE ENDS HERE
 
                 if checkmate:
@@ -298,10 +314,12 @@ def main():
                 deltaHid = np.dot(deltaOut,w_hidden_output) * np.heaviside(out1, 0)
                 w_input_hidden = w_input_hidden + eta * np.outer(deltaHid, x)
                 bias_W1 = eta * deltaHid
+                
+                R_save[n+1, 0] = alpha * R + (1-alpha) * R_save[n, 0]
+                N_moves_save[n+1, 0] = alpha * i + (1-alpha) * N_moves_save[n, 0]
 
                 # YOUR CODE ENDS HERE
                 
-                Q = Q + (eta * (R-Q))
 
                 if draw:
                     break
@@ -335,7 +353,6 @@ def main():
             # Compute Q-values for the discounted factor
 #            Q_next = Q_values(x_next, W1, W2, bias_W1, bias_W2)
             Q_next, demon = Q_values(x_next, w_input_hidden, w_hidden_output, bias_W1, bias_W2)
-            print((Q_next))
             t = R + (gamma * max(Q_next))
             """
             FILL THE CODE
@@ -345,7 +362,7 @@ def main():
             iteration of the episode, the match continues.
             """
 
-            deltaOut = (t-Q_next) * np.heaviside(Q_next, 0)
+            deltaOut = (t-Q) * np.heaviside(Q, 0)
             w_hidden_output += eta * np.outer(deltaOut, out1)
             bias_W2 = eta * deltaOut
                 
@@ -355,7 +372,45 @@ def main():
 
             # YOUR CODE ENDS HERE
             i += 1
+#        print(R)
+        R_save[n+1, 0] = alpha * R + (1-alpha) * R_save[n, 0]
+        N_moves_save[n+1, 0] = alpha * i + (1-alpha) * N_moves_save[n, 0]
+    
+    return R_save, N_moves_save
+        
+        
 
 
 if __name__ == '__main__':
-    main()
+#    repetitions = 15
+#    N_episodes = 1000
+#    totalRewards = np.zeros((repetitions, N_episodes))
+#    fontSize = 18
+#    
+#    for j in tqdm(range(repetitions)):
+#        totalRewards[j,:] = main()
+#        
+#    plt.figure(figsize = (8, 6))
+#    means = np.mean(totalRewards, axis = 0)
+#    errors = 2 * np.std(totalRewards, axis = 0) / np.sqrt(repetitions) # errorbars are equal to twice standard error i.e. std/sqrt(samples)
+#    plt.errorbar(np.arange(N_episodes), means, errors, 0, elinewidth = 2, capsize = 4, alpha =0.8)
+#    plt.xlabel('Trial',fontsize = fontSize)
+#    plt.ylabel('Average Reward',fontsize = fontSize)
+#    plt.axis((-(N_episodes/10.0),N_episodes,-0.1,1.1))
+#    plt.tick_params(axis = 'both', which='major', labelsize = 14)
+#    plt.show()
+    
+    check, check2 = main()
+#    plt.subplot(211)
+#    
+#    plt.ylabel('Average Reward',fontsize = 18)
+#    plt.plot(check)
+#    
+#    plt.subplot(212)
+#    plt.xlabel('Episode',fontsize = 18)
+#    plt.show()
+    
+    f, axarr = plt.subplots(2, sharex=True)
+    axarr[0].plot(check)
+    axarr[1].plot(check2)
+    
