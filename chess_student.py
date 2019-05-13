@@ -15,7 +15,7 @@ def main():
     Generate a new game
     The function below generates a new chess board with King, Queen and Enemy King pieces randomly assigned so that they
     do not cause any threats to each other.
-    s: a size_board x size_board matrix filled with zeros and three numbers:
+    s: a size_board   size_board matrix filled with zeros and three numbers:
     1 = location of the King
     2 = location of the Queen
     3 = location fo the Enemy King
@@ -79,16 +79,19 @@ def main():
     refer to the number of nodes in the input layer and the number of nodes in the hidden layer respectively. The biases
      should be initialized with zeros.
     """
-    n_input_layer = 1  # Number of neurons of the input layer. TODO: Change this value
+    n_input_layer = 50  # Number of neurons of the input layer. TODO: Change this value
     n_hidden_layer = 200  # Number of neurons of the hidden layer
-    n_output_layer = 1  # Number of neurons of the output layer. TODO: Change this value accordingly
+    n_output_layer = 32  # Number of neurons of the output layer. TODO: Change this value accordingly
 
     """
     TODO: Define the w weights between the input and the hidden layer and the w weights between the hidden layer and the 
     output layer according to the instructions. Define also the biases.
     """
 
-
+    w_input_hidden = np.random.rand(n_hidden_layer,n_input_layer)/(n_input_layer * n_hidden_layer)
+    w_hidden_output = np.random.rand(n_output_layer,n_hidden_layer)/(n_hidden_layer * n_output_layer)
+    bias_W1 = np.zeros((n_hidden_layer))
+    bias_W2 = np.zeros((n_output_layer))
 
 
     # YOUR CODES ENDS HERE
@@ -139,6 +142,11 @@ def main():
         dfQ1, a_q1, dfQ1_ = degree_freedom_queen(p_k1, p_k2, p_q1, s)
         # Possible actions of the enemy king
         dfK2, a_k2, check = degree_freedom_king2(dfK1, p_k2, dfQ1_, s, p_k1)
+        
+        
+        Start = np.array([np.random.randint(size_board),np.random.randint(size_board)])   #random start
+        s_start = np.ravel_multi_index(Start,dims=(size_board,size_board),order='F')      #conversion in single index
+        s_index = s_start
 
         while checkmate == 0 and draw == 0:
             R = 0  # Reward
@@ -148,7 +156,8 @@ def main():
             # Actions & allowed_actions
             a = np.concatenate([np.array(a_q1), np.array(a_k1)])
             allowed_a = np.where(a > 0)[0]
-
+#            print(a)
+#            print(allowed_a)
             # Computing Features
             x = features(p_q1, p_k1, p_k2, dfK2, s, check)
 
@@ -157,24 +166,54 @@ def main():
             # You need to compute the Q values as output of your neural
             # network. You can change the input of the function by adding other
             # data, but the input of the function is suggested. 
-            Q, out1 = Q_values(x, W1, W2, bias_W1, bias_W2)
-
+            
+#            states_matrix = np.eye(size_board*size_board)
+    
+#            input_matrix = states_matrix[:,s_index].reshape((size_board*size_board),1)
+            
+            Q, out1 = Q_values(x, w_input_hidden, w_hidden_output, bias_W1, bias_W2)
+#            print(Q)
+#            print(np.argsort(-Q))
+#            print(len(Q))
             """
             YOUR CODE STARTS HERE
             
             FILL THE CODE
             Implement epsilon greedy policy by using the vector a and a_allowed vector: be careful that the action must
             be chosen from the a_allowed vector. The index of this action must be remapped to the index of the vector a,
-            containing all the possible actions. Create a vector calle da_agent that contains the index of the action 
+            containing all the possible actions. Create a vector called a_agent that contains the index of the action 
             chosen. For instance, if a_allowed = [8, 16, 32] and you select the third action, a_agent=32 not 3.
             """
             
+            greedy = (np.random.rand() > epsilon_0)
             
+            if greedy:
+#                a_agent = np.random.choice(allowed_a)
 
-            a_agent = 1  # CHANGE THIS VALUE BASED ON YOUR CODE TO USE EPSILON GREEDY POLICY
+                max_sort = np.argsort(-Q)
+                for i in max_sort:
+                    if i in allowed_a:
+                        a_agent = i
+                        break
+                    else:
+                        a_agent = np.random.choice(allowed_a)
+#                if np.argmax(Q) in allowed_a:
+#                    a_agent = np.argmax(Q)
+#                else:
+#                a_agent = np.argmax(Q)
+                    
+            else:
+                a_agent = np.random.choice(allowed_a)
+#                a_agent = a.index(a_agent)
+                
+#            if action in allowed_a:
+#                a_agent = 
+
+#            a_agent = 1  # CHANGE THIS VALUE BASED ON YOUR CODE TO USE EPSILON GREEDY POLICY
             
             #THE CODE ENDS HERE. 
 
+            print(a_agent)
 
             # Player 1 makes the action
             if a_agent < possible_queen_a:
@@ -214,6 +253,7 @@ def main():
                 # Checkmate and collect reward
                 checkmate = 1
                 R = 1  # Reward for checkmate
+                t = R + (gamma * max(Q))
 
                 """
                 FILL THE CODE
@@ -223,7 +263,14 @@ def main():
                 iteration of the episode, the agent gave checkmate.
                 """
 
-
+                deltaOut = (t-Q) * np.heaviside(Q, 0)
+                w_hidden_output += eta * np.outer(deltaOut, out1)
+                bias_W2 = eta * deltaOut
+                
+                deltaHid = np.dot(deltaOut,w_hidden_output) * np.heaviside(out1, 0)
+                w_input_hidden = w_input_hidden + eta * np.outer(deltaHid, x)
+                bias_W1 = eta * deltaHid
+                
                 # THE CODE ENDS HERE
 
                 if checkmate:
@@ -233,7 +280,9 @@ def main():
                 # King 2 has no freedom but it is not checked
                 draw = 1
                 R = 0.1
-
+#                print(Q)
+                t = R + (gamma * max(Q))
+                
                 """
                 FILL THE CODE
                 Update the parameters of your network by applying backpropagation and Q-learning. You need to use the 
@@ -242,7 +291,17 @@ def main():
                 iteration of the episode, it is a draw.
                 """
 
+                deltaOut = (t-Q) * np.heaviside(Q, 0)
+                w_hidden_output += eta * np.outer(deltaOut, out1)
+                bias_W2 = eta * deltaOut
+                
+                deltaHid = np.dot(deltaOut,w_hidden_output) * np.heaviside(out1, 0)
+                w_input_hidden = w_input_hidden + eta * np.outer(deltaHid, x)
+                bias_W1 = eta * deltaHid
+
                 # YOUR CODE ENDS HERE
+                
+                Q = Q + (eta * (R-Q))
 
                 if draw:
                     break
@@ -274,8 +333,10 @@ def main():
             # Compute features
             x_next = features(p_q1, p_k1, p_k2, dfK2, s, check)
             # Compute Q-values for the discounted factor
-            Q_next, _ = Q_values(x_next, W1, W2, bias_W1, bias_W2)
-
+#            Q_next = Q_values(x_next, W1, W2, bias_W1, bias_W2)
+            Q_next, demon = Q_values(x_next, w_input_hidden, w_hidden_output, bias_W1, bias_W2)
+            print((Q_next))
+            t = R + (gamma * max(Q_next))
             """
             FILL THE CODE
             Update the parameters of your network by applying backpropagation and Q-learning. You need to use the 
@@ -283,6 +344,14 @@ def main():
             the action made. You computed previously Q values in the Q_values function. Be careful: this is not the last 
             iteration of the episode, the match continues.
             """
+
+            deltaOut = (t-Q_next) * np.heaviside(Q_next, 0)
+            w_hidden_output += eta * np.outer(deltaOut, out1)
+            bias_W2 = eta * deltaOut
+                
+            deltaHid = np.dot(deltaOut,w_hidden_output) * np.heaviside(out1, 0)
+            w_input_hidden = w_input_hidden + eta * np.outer(deltaHid, x_next)
+            bias_W1 = eta * deltaHid
 
             # YOUR CODE ENDS HERE
             i += 1

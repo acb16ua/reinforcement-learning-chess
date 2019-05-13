@@ -15,12 +15,15 @@ def Q_values(x, W1, W2, bias_W1, bias_W2):
     there are othere possibilities, these are our suggestions
     YOUR CODE STARTS HERE
     """
-
-    # Neural activation: input layer -> hidden layer
-
-
-    # Neural activation: hidden layer -> output layer
+    
     
 
+    # Neural activation: input layer -> hidden layer
+    act1 = W1.dot(x) + bias_W1
+    out1 = np.heaviside(act1,0)
+
+    # Neural activation: hidden layer -> output layer
+    act2 = W2.dot(out1) + bias_W2
+    out2 = np.heaviside(act2, 0)
     # YOUR CODE ENDS HERE
-    return Q, out1
+    return out2, out1
